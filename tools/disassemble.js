@@ -67,7 +67,7 @@ const INSTRUCTIONS = {
 	0x39: {name: "AND", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
 	0x3d: {name: "AND", addressing: ADDRESSING_MODES.ABSOLUTE_X },
 	0x3e: {name: "ROL", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x40: {name: "RTI", addressing: ADDRESSING_MODES.IMPLICIT, branch: true, terminal: true },
+	0x40: {name: "RTI", addressing: ADDRESSING_MODES.IMPLICIT, terminal: true },
 	0x41: {name: "EOR", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
 	0x45: {name: "EOR", addressing: ADDRESSING_MODES.ZEROPAGE },
 	0x46: {name: "LSR", addressing: ADDRESSING_MODES.ZEROPAGE },
@@ -85,14 +85,14 @@ const INSTRUCTIONS = {
 	0x59: {name: "EOR", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
 	0x5d: {name: "EOR", addressing: ADDRESSING_MODES.ABSOLUTE_X },
 	0x5e: {name: "LSR", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x60: {name: "RTS", addressing: ADDRESSING_MODES.IMPLICIT, branch: true, terminal: true },
+	0x60: {name: "RTS", addressing: ADDRESSING_MODES.IMPLICIT, terminal: true },
 	0x61: {name: "ADC", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
 	0x65: {name: "ADC", addressing: ADDRESSING_MODES.ZEROPAGE },
 	0x66: {name: "ROR", addressing: ADDRESSING_MODES.ZEROPAGE },
 	0x68: {name: "PLA", addressing: ADDRESSING_MODES.IMPLICIT },
 	0x69: {name: "ADC", addressing: ADDRESSING_MODES.IMMEDIATE },
 	0x6a: {name: "ROR", addressing: ADDRESSING_MODES.ACCUMULATOR },
-	0x6c: {name: "JMP", addressing: ADDRESSING_MODES.INDIRECT, branch: true },
+	0x6c: {name: "JMP", addressing: ADDRESSING_MODES.INDIRECT, branch: true, terminal: true },
 	0x6d: {name: "ADC", addressing: ADDRESSING_MODES.ABSOLUTE },
 	0x6e: {name: "ROR", addressing: ADDRESSING_MODES.ABSOLUTE },
 	0x70: {name: "BVS", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
@@ -213,12 +213,18 @@ const disassemble = prgRom => {
 
     // each byte in the program ROM is either part of an instruction or data
     // we associate the first byte of each opcode with the decoded instruction, and assume everything else is data
-    const bytes = new Array(prgRom.length);
+    const byteTags = new Array(prgRom.length);
     for(let i = 0; i < prgRom.length; i++) {
-        bytes[i] = {type: "data", value: prgRom[i]};
+        byteTags[i] = {type: "data", value: prgRom[i]};
     }
 
     const disassembleRecursive = startPC => {
+
+        // if we've already disassembled here, don't visit again
+        const tag = byteTags[startPC - PRG_ROM_BASE];
+        if(!tag || tag.type != "data") {
+            return;
+        }
 
         // record branch target
         branchTargets.push(startPC);
@@ -230,6 +236,8 @@ const disassemble = prgRom => {
             pc += 2;
             return retval;
         };
+
+        console.log("=".repeat(40));
 
         while(1) {
 
@@ -243,6 +251,7 @@ const disassemble = prgRom => {
 
             // decode operands
             let disasm = null;
+            let target = null;
             switch(insn.addressing) {
                 case ADDRESSING_MODES.IMPLICIT:
                     disasm = insn.name;
@@ -263,11 +272,14 @@ const disassemble = prgRom => {
                     disasm = `${insn.name} $${byte2hex(readByte())},Y`;
                     break;
                 case ADDRESSING_MODES.RELATIVE:
-                    const target = insnOffset + 2 + readByte();
+                    const nextPC = insnOffset + 2,
+                          offset = readByte() << 24 >> 24; // sign-extend signed 8 bit offset
+                    target = nextPC + offset;
                     disasm = `${insn.name} $${word2hex(target)}`;
                     break;
                 case ADDRESSING_MODES.ABSOLUTE:
-                    disasm = `${insn.name} $${word2hex(readWord())}`;
+                    target = readWord();
+                    disasm = `${insn.name} $${word2hex(target)}`;
                     break;
                 case ADDRESSING_MODES.ABSOLUTE_X:
                     disasm = `${insn.name} $${word2hex(readWord())},X`;
@@ -286,19 +298,27 @@ const disassemble = prgRom => {
                     break;
             }
 
-            console.log(`${prgRom.subarray(insnOffset-PRG_ROM_BASE, pc-PRG_ROM_BASE).toString("hex")}: ${disasm}`);
-
             // tag first byte of instruction with disassembly, and null the other bytes of the instruction
-            bytes[insnOffset] = disasm;
+            byteTags[insnOffset - PRG_ROM_BASE] = disasm;
             for(let i = insnOffset + 1; i < pc; i++) {
-                bytes[i] = null;
+                byteTags[i - PRG_ROM_BASE] = null;
             }
 
+            console.log(`${word2hex(insnOffset)}: ${Array.from(prgRom.subarray(insnOffset-PRG_ROM_BASE, pc-PRG_ROM_BASE)).map(byte2hex).join(' ').padEnd(8, ' ')}    ${disasm}`);
+
             // follow branches
+            let subroutineReturns = null;
+            if(insn.branch) {
+                if(target) {
+                    subroutineReturns = disassembleRecursive(target);
+                } else {
+                    console.log("warning: could not identify branch target");
+                }
+            }
             
-            // if branch was terminal, don't continue disassembling
-            if(insn.terminal) {
-                break;
+            // if branch was terminal, don't continue disassembling; indicate whether this subroutine returns to caller
+            if(insn.terminal || (insn.name == "JSR" && !subroutineReturns)) {
+                return insn.name == "RTS";
             }
 
         }
@@ -306,8 +326,11 @@ const disassemble = prgRom => {
     };
 
     // start disassembly at known branch targets
+    console.log("disassembling NMI vector");
     disassembleRecursive(prgRom.readUInt16LE(NMI_VECTOR - PRG_ROM_BASE));
+    console.log("disassembling reset vector");
     disassembleRecursive(prgRom.readUInt16LE(RESET_VECTOR - PRG_ROM_BASE));
+    console.log("disassembling IRQ vector");
     disassembleRecursive(prgRom.readUInt16LE(IRQ_VECTOR - PRG_ROM_BASE));
 
 };
