@@ -202,7 +202,7 @@ const readROM = rom => {
 };
 
 // formatting instructions
-const addrToLabel = addr => "lab_" + addr.toString(16).padStart(4, '0');
+const addrToLabel = addr => "_label_" + addr.toString(16).padStart(4, '0');
 const byte2hex = byte => byte.toString(16).padStart(2, '0');
 const word2hex = word => word.toString(16).padStart(4, '0');
 
@@ -215,14 +215,14 @@ const disassemble = prgRom => {
     // we associate the first byte of each opcode with the decoded instruction, and assume everything else is data
     const byteTags = new Array(prgRom.length);
     for(let i = 0; i < prgRom.length; i++) {
-        byteTags[i] = {type: "data", value: prgRom[i]};
+        byteTags[i] = {data: prgRom[i]};
     }
 
     const disassembleRecursive = startPC => {
 
         // if we've already disassembled here, don't visit again
-        const tag = byteTags[startPC - PRG_ROM_BASE];
-        if(!tag || tag.type != "data") {
+        const initialTag = byteTags[startPC - PRG_ROM_BASE];
+        if(!initialTag || initialTag.disasm) {
             return;
         }
 
@@ -236,8 +236,6 @@ const disassemble = prgRom => {
             pc += 2;
             return retval;
         };
-
-        console.log("=".repeat(40));
 
         while(1) {
 
@@ -275,11 +273,14 @@ const disassemble = prgRom => {
                     const nextPC = insnOffset + 2,
                           offset = readByte() << 24 >> 24; // sign-extend signed 8 bit offset
                     target = nextPC + offset;
-                    disasm = `${insn.name} $${word2hex(target)}`;
+                    disasm = `${insn.name} ${addrToLabel(target)}`;
                     break;
                 case ADDRESSING_MODES.ABSOLUTE:
                     target = readWord();
-                    disasm = `${insn.name} $${word2hex(target)}`;
+                    if(insn.branch)
+                        disasm = `${insn.name} ${addrToLabel(target)}`;
+                    else
+                        disasm = `${insn.name} $${word2hex(target)}`;
                     break;
                 case ADDRESSING_MODES.ABSOLUTE_X:
                     disasm = `${insn.name} $${word2hex(readWord())},X`;
@@ -299,12 +300,11 @@ const disassemble = prgRom => {
             }
 
             // tag first byte of instruction with disassembly, and null the other bytes of the instruction
-            byteTags[insnOffset - PRG_ROM_BASE] = disasm;
+            const tag = {disasm, length: pc - insnOffset};
+            byteTags[insnOffset - PRG_ROM_BASE] = tag;
             for(let i = insnOffset + 1; i < pc; i++) {
                 byteTags[i - PRG_ROM_BASE] = null;
             }
-
-            console.log(`${word2hex(insnOffset)}: ${Array.from(prgRom.subarray(insnOffset-PRG_ROM_BASE, pc-PRG_ROM_BASE)).map(byte2hex).join(' ').padEnd(8, ' ')}    ${disasm}`);
 
             // follow branches
             let subroutineReturns = null;
@@ -312,11 +312,11 @@ const disassemble = prgRom => {
                 if(target) {
                     subroutineReturns = disassembleRecursive(target);
                 } else {
-                    console.log("warning: could not identify branch target");
+                    tag.unknownTarget = true;
                 }
             }
             
-            // if branch was terminal, don't continue disassembling; indicate whether this subroutine returns to caller
+            // if branch was terminal, don't continue disassembling; indicate whether this subroutine returns to caller in the returns
             if(insn.terminal || (insn.name == "JSR" && !subroutineReturns)) {
                 return insn.name == "RTS";
             }
@@ -325,15 +325,29 @@ const disassemble = prgRom => {
 
     };
 
-    // start disassembly at known branch targets
-    console.log("disassembling NMI vector");
+    // start disassembly at known locations
     disassembleRecursive(prgRom.readUInt16LE(NMI_VECTOR - PRG_ROM_BASE));
-    console.log("disassembling reset vector");
     disassembleRecursive(prgRom.readUInt16LE(RESET_VECTOR - PRG_ROM_BASE));
-    console.log("disassembling IRQ vector");
     disassembleRecursive(prgRom.readUInt16LE(IRQ_VECTOR - PRG_ROM_BASE));
+
+    // write output
+    let outLines = [];
+    for(let i = 0; i < byteTags.length; i++) {
+        const addr = i + PRG_ROM_BASE;
+        const tag = byteTags[i];
+        if(branchTargets.includes(addr)) {
+            outLines.push(`${addrToLabel(addr)}:`)
+        }
+        if(tag != null) {
+            const hexdump = Array.from(prgRom.subarray(i, i + (tag.length || 1))).map(byte2hex).join(" ");
+            outLines.push(`    ${word2hex(addr)}: ${hexdump.padEnd(8, ' ')}    ${(tag.disasm || "??").padEnd(12, ' ')} ${tag.unknownTarget ? "; UNKNOWN TARGET" : ""}`);
+        }
+    }
+
+    return outLines.join("\n");
 
 };
 
+// usage: node tools/disassemble.js [IN-ROM] [OUT-DUMP]
 const rom = readROM(fs.readFileSync(process.argv[2]));
-disassemble(rom.prgRom);
+fs.writeFileSync(process.argv[3], disassemble(rom.prgRom));
