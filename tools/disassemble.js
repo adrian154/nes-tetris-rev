@@ -368,12 +368,26 @@ const disassemble = (prgRom, hints) => {
         }
     }
 
+    // look for references to symbols in data
+    for(let i = 0; i < byteTags.length - 1; i++) {
+        const cur = byteTags[i], next = byteTags[i+1];
+        if(cur && next && "data" in cur && "data" in next) {
+            const word = byteTags[i].data | byteTags[i+1].data << 8;
+            const symbol = lookupSymbol(word);
+            if(symbol) {
+                byteTags[i].disasm = `.word ${symbol}`;
+                byteTags[i+1] = null;
+            }
+        }
+    }
+
     // write output
     let outLines = [];
     for(let i = 0; i < byteTags.length; i++) {
         
         const addr = i + PRG_ROM_BASE;
 
+        // insert labels for known symbols
         const symbols = hints.symbols.filter(symbol => symbol.addr == addr);
         for(const symbol of symbols) {
             outLines.push(symbol.name + ":");
