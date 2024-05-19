@@ -1,3 +1,36 @@
+# NES constants
+constant PPUCTRL    0x2000
+constant PPUMASK    0x2001
+constant PPUSTATUS  0x2002
+constant OAMADDR    0x2003
+constant OAMDATA    0x2004
+constant PPUSCROLL  0x2005
+constant PPUADDR    0x2006
+constant PPUDATA    0x2007
+
+constant SQ1_VOL    0x4000
+constant SQ1_SWEEP  0x4001
+constant SQ1_LO     0x4002
+constant SQ1_HI     0x4003
+constant SQ2_VOL    0x4004
+constant SQ2_SWEEP  0x4005
+constant SQ2_LO     0x4006
+constant SQ2_HI     0x4007
+constant TRI_LINEAR 0x4008
+constant TRI_LO     0x400A
+constant TRI_HI     0x400B
+constant NOISE_VOL  0x400C
+constant NOISE_LO   0x400E
+constant NOISE_HI   0x400F
+constant DMC_FREQ   0x4010
+constant DMC_RAW    0x4011
+constant DMC_START  0x4012
+constant DMC_LEN    0x4013
+constant OAMDMA     0x4014
+constant SND_CHN    0x4015
+constant JOY1       0x4016
+constant JOY2       0x4017
+
 symbol jumpTable 0xac82
 nonreturn 0xac82
 
@@ -38,8 +71,18 @@ symbol _jt_81b4_9 0x9e39
 symbol _jt_81b4_10 0x9a11 
 symbol _jt_81b4_11 0x9e37 
 
-# ?
-stop 0x81db
+symbol _jt_81db_0 0x9e2f
+symbol _jt_81db_1 0x81f6
+symbol _jt_81db_0 0x992a
+symbol _jt_81db_0 0x9a6b
+symbol _jt_81db_0 0x9e39
+symbol _jt_81db_0 0x9b58
+symbol _jt_81db_0 0xa3f2
+symbol _jt_81db_0 0x9b03
+symbol _jt_81db_0 0x988e
+symbol _jt_81db_0 0x9e39
+symbol _jt_81db_0 0x9a11
+symbol _jt_81db_0 0x9e37
 
 # ???
-noreturn 0xaa98
+nonreturn 0xaa98

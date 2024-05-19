@@ -222,7 +222,7 @@ const disassemble = (prgRom, hints) => {
     }
 
     const lookupSymbol = addr => hints.symbols.find(symbol => symbol.addr == addr)?.name;
-    //const addrToLabel = addr => hints.symbols.find(symbol => symbol.addr == addr)?.name ||  "_label_" + addr.toString(16).padStart(4, '0');
+    const lookupConstant = constant => hints.constants[constant] || "$"+word2hex(constant);
 
     const disassembleRecursive = startPC => {
 
@@ -301,16 +301,16 @@ const disassemble = (prgRom, hints) => {
                     if(insn.branch)
                         disasm = `${insn.name} ${symbol}`;
                     else
-                        disasm = `${insn.name} $${word2hex(target)}`;
+                        disasm = `${insn.name} ${lookupConstant(target)}`;
                     break;
                 case ADDRESSING_MODES.ABSOLUTE_X:
-                    disasm = `${insn.name} $${word2hex(readWord())},X`;
+                    disasm = `${insn.name} ${lookupConstant(readWord())},X`;
                     break;
                 case ADDRESSING_MODES.ABSOLUTE_Y:
-                    disasm = `${insn.name} $${word2hex(readWord())},Y`;
+                    disasm = `${insn.name} ${lookupConstant(readWord())},Y`;
                     break;
                 case ADDRESSING_MODES.INDIRECT:
-                    disasm = `${insn.name} $(${word2hex(readWord())})`;
+                    disasm = `${insn.name} (${lookupConstant(readWord())})`;
                     break;
                 case ADDRESSING_MODES.INDEXED_INDIRECT:
                     disasm = `${insn.name} ($${byte2hex(readByte())},X)`;
@@ -376,6 +376,7 @@ const disassemble = (prgRom, hints) => {
             const symbol = lookupSymbol(word);
             if(symbol) {
                 byteTags[i].disasm = `.word ${symbol}`;
+                byteTags[i].length = 2;
                 byteTags[i+1] = null;
             }
         }
