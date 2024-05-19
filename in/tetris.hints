@@ -1,12 +1,45 @@
+symbol jumpTable 0xac82
+nonreturn 0xac82
+
 symbol _jt_804d_0 0x82b1
 symbol _jt_804d_1 0x85da
 symbol _jt_804d_2 0xa344
 symbol _jt_804d_3 0x94ee
 symbol _jt_804d_4 0x9f95
-stop 0x804d
 
-# jt
 symbol _jt_8163_0 0x8200
-stop 0x8163
+symbol _jt_8163_1 0x824f
+symbol _jt_8163_2 0x82d1
+symbol _jt_8163_3 0x83d7
+symbol _jt_8163_4 0x815d
+symbol _jt_8163_5 0x815d
+symbol _jt_8163_6 0x9df6
 
-# jt
+symbol _jt_819d_0 0x85f0
+symbol _jt_819d_1 0x86dc
+symbol _jt_819d_2 0x8884
+symbol _jt_819d_3 0x9cbf
+symbol _jt_819d_4 0x8174
+symbol _jt_819d_5 0x8186
+symbol _jt_819d_6 0x9e16
+symbol _jt_819d_7 0xa37f
+symbol _jt_819d_8 0x9e27
+
+symbol _jt_81b4_0 0x9e2f
+symbol _jt_81b4_1 0x81cf
+symbol _jt_81b4_2 0x99a2
+symbol _jt_81b4_3 0x9a6b
+symbol _jt_81b4_4 0x9e39
+symbol _jt_81b4_5 0x9b58
+symbol _jt_81b4_6 0xa3f2
+symbol _jt_81b4_7 0x9b03 
+symbol _jt_81b4_8 0x988e 
+symbol _jt_81b4_9 0x9e39 
+symbol _jt_81b4_10 0x9a11 
+symbol _jt_81b4_11 0x9e37 
+
+# ?
+stop 0x81db
+
+# ???
+noreturn 0xaa98

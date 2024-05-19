@@ -1,7 +1,7 @@
 # Disassembler Wishlist
 
-* Potential issue: recognizing indirect jump/NMI targets
-* Recognize constants
-* Recognize common pseudo-instruction sequences
+* Hints for indirect jumps
+* Hints for constants
+* Recognize encoded offsets
 
 # Assembler

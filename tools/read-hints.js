@@ -5,7 +5,7 @@ module.exports = hintsFile => {
 
     const hints = {
         symbols: [], 
-        stops: []
+        nonreturns: []
     };
     
     const lines = fs.readFileSync(hintsFile, "ascii").split("\n").map(l => l.trim());
@@ -18,10 +18,10 @@ module.exports = hintsFile => {
             if(parts.length != 3)
                 throw new Error("syntax: symbol <name> <addr>");
             hints.symbols.push({name: parts[1], addr: Number(parts[2])});
-        } else if(parts[0] == "stop") {
+        } else if(parts[0] == "nonreturn") {
             if(parts.length != 2)
-                throw new Error("syntax: stop <addr>");
-            hints.stops.push(Number(parts[1]));
+                throw new Error("syntax: nonreturn <addr>");
+            hints.nonreturns.push(Number(parts[1]));
         }
     }
 

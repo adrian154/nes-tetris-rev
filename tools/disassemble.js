@@ -1,5 +1,6 @@
 // a very basic NES ROM disassembler
 // many assumptions associated with the NES Tetris cartridge are hardcoded, so it definitely won't work for all NES ROMs
+const parseHints = require("./read-hints.js");
 const fs = require("fs");
 
 const INES_HEADER_MAGIC = Buffer.from([0x4e, 0x45, 0x53, 0x1a]);
@@ -31,157 +32,157 @@ const ADDRESSING_MODES = {
 // instruction decoding information
 // `terminal` indicates that the disassembler should not proceed past this instruction; this is mainly used for unconditional jumps
 const INSTRUCTIONS = {
-	0x00: {name: "BRK", addressing: ADDRESSING_MODES.IMPLICIT, branch: true },
-	0x01: {name: "ORA", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0x05: {name: "ORA", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x06: {name: "ASL", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x08: {name: "PHP", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x09: {name: "ORA", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0x0a: {name: "ASL", addressing: ADDRESSING_MODES.ACCUMULATOR },
-	0x0d: {name: "ORA", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x0e: {name: "ASL", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x10: {name: "BPL", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0x11: {name: "ORA", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0x15: {name: "ORA", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x16: {name: "ASL", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x18: {name: "CLC", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x19: {name: "ORA", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0x1d: {name: "ORA", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x1e: {name: "ASL", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x20: {name: "JSR", addressing: ADDRESSING_MODES.ABSOLUTE, branch: true },
-	0x21: {name: "AND", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0x24: {name: "BIT", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x25: {name: "AND", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x26: {name: "ROL", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x28: {name: "PLP", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x29: {name: "AND", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0x2a: {name: "ROL", addressing: ADDRESSING_MODES.ACCUMULATOR },
-	0x2c: {name: "BIT", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x2d: {name: "AND", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x2e: {name: "ROL", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x30: {name: "BMI", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0x31: {name: "AND", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0x35: {name: "AND", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x36: {name: "ROL", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x38: {name: "SEC", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x39: {name: "AND", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0x3d: {name: "AND", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x3e: {name: "ROL", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x40: {name: "RTI", addressing: ADDRESSING_MODES.IMPLICIT, terminal: true },
-	0x41: {name: "EOR", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0x45: {name: "EOR", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x46: {name: "LSR", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x48: {name: "PHA", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x49: {name: "EOR", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0x4a: {name: "LSR", addressing: ADDRESSING_MODES.ACCUMULATOR },
-	0x4c: {name: "JMP", addressing: ADDRESSING_MODES.ABSOLUTE, branch: true, terminal: true },
-	0x4d: {name: "EOR", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x4e: {name: "LSR", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x50: {name: "BVC", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0x51: {name: "EOR", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0x55: {name: "EOR", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x56: {name: "LSR", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x58: {name: "CLI", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x59: {name: "EOR", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0x5d: {name: "EOR", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x5e: {name: "LSR", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x60: {name: "RTS", addressing: ADDRESSING_MODES.IMPLICIT, terminal: true },
-	0x61: {name: "ADC", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0x65: {name: "ADC", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x66: {name: "ROR", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x68: {name: "PLA", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x69: {name: "ADC", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0x6a: {name: "ROR", addressing: ADDRESSING_MODES.ACCUMULATOR },
-	0x6c: {name: "JMP", addressing: ADDRESSING_MODES.INDIRECT, branch: true, terminal: true },
-	0x6d: {name: "ADC", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x6e: {name: "ROR", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x70: {name: "BVS", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0x71: {name: "ADC", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0x75: {name: "ADC", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x76: {name: "ROR", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x78: {name: "SEI", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x79: {name: "ADC", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0x7d: {name: "ADC", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x7e: {name: "ROR", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0x81: {name: "STA", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0x84: {name: "STY", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x85: {name: "STA", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x86: {name: "STX", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0x88: {name: "DEY", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x8a: {name: "TXA", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x8c: {name: "STY", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x8d: {name: "STA", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x8e: {name: "STX", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0x90: {name: "BCC", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0x91: {name: "STA", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0x94: {name: "STY", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x95: {name: "STA", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0x96: {name: "STX", addressing: ADDRESSING_MODES.ZEROPAGE_Y },
-	0x98: {name: "TYA", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x99: {name: "STA", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0x9a: {name: "TXS", addressing: ADDRESSING_MODES.IMPLICIT },
-	0x9d: {name: "STA", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0xa0: {name: "LDY", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0xa1: {name: "LDA", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0xa2: {name: "LDX", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0xa4: {name: "LDY", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xa5: {name: "LDA", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xa6: {name: "LDX", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xa8: {name: "TAY", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xa9: {name: "LDA", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0xaa: {name: "TAX", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xac: {name: "LDY", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xad: {name: "LDA", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xae: {name: "LDX", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xb0: {name: "BCS", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0xb1: {name: "LDA", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0xb4: {name: "LDY", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0xb5: {name: "LDA", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0xb6: {name: "LDX", addressing: ADDRESSING_MODES.ZEROPAGE_Y },
-	0xb8: {name: "CLV", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xb9: {name: "LDA", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0xba: {name: "TSX", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xbc: {name: "LDY", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0xbd: {name: "LDA", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0xbe: {name: "LDX", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0xc0: {name: "CPY", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0xc1: {name: "CMP", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0xc4: {name: "CPY", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xc5: {name: "CMP", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xc6: {name: "DEC", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xc8: {name: "INY", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xc9: {name: "CMP", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0xca: {name: "DEX", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xcc: {name: "CPY", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xcd: {name: "CMP", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xce: {name: "DEC", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xd0: {name: "BNE", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0xd1: {name: "CMP", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0xd5: {name: "CMP", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0xd6: {name: "DEC", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0xd8: {name: "CLD", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xd9: {name: "CMP", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0xdd: {name: "CMP", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0xde: {name: "DEC", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0xe0: {name: "CPX", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0xe1: {name: "SBC", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
-	0xe4: {name: "CPX", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xe5: {name: "SBC", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xe6: {name: "INC", addressing: ADDRESSING_MODES.ZEROPAGE },
-	0xe8: {name: "INX", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xe9: {name: "SBC", addressing: ADDRESSING_MODES.IMMEDIATE },
-	0xea: {name: "NOP", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xec: {name: "CPX", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xed: {name: "SBC", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xee: {name: "INC", addressing: ADDRESSING_MODES.ABSOLUTE },
-	0xf0: {name: "BEQ", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
-	0xf1: {name: "SBC", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
-	0xf5: {name: "SBC", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0xf6: {name: "INC", addressing: ADDRESSING_MODES.ZEROPAGE_X },
-	0xf8: {name: "SED", addressing: ADDRESSING_MODES.IMPLICIT },
-	0xf9: {name: "SBC", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
-	0xfd: {name: "SBC", addressing: ADDRESSING_MODES.ABSOLUTE_X },
-	0xfe: {name: "INC", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x00: {name: "brk", addressing: ADDRESSING_MODES.IMPLICIT, branch: true },
+	0x01: {name: "ora", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0x05: {name: "ora", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x06: {name: "asl", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x08: {name: "php", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x09: {name: "ora", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0x0a: {name: "asl", addressing: ADDRESSING_MODES.ACCUMULATOR },
+	0x0d: {name: "ora", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x0e: {name: "asl", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x10: {name: "bpl", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0x11: {name: "ora", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0x15: {name: "ora", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x16: {name: "asl", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x18: {name: "clc", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x19: {name: "ora", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0x1d: {name: "ora", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x1e: {name: "asl", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x20: {name: "jsr", addressing: ADDRESSING_MODES.ABSOLUTE, branch: true },
+	0x21: {name: "and", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0x24: {name: "bit", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x25: {name: "and", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x26: {name: "rol", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x28: {name: "plp", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x29: {name: "and", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0x2a: {name: "rol", addressing: ADDRESSING_MODES.ACCUMULATOR },
+	0x2c: {name: "bit", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x2d: {name: "and", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x2e: {name: "rol", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x30: {name: "bmi", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0x31: {name: "and", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0x35: {name: "and", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x36: {name: "rol", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x38: {name: "sec", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x39: {name: "and", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0x3d: {name: "and", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x3e: {name: "rol", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x40: {name: "rti", addressing: ADDRESSING_MODES.IMPLICIT, terminal: true },
+	0x41: {name: "eor", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0x45: {name: "eor", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x46: {name: "lsr", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x48: {name: "pha", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x49: {name: "eor", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0x4a: {name: "lsr", addressing: ADDRESSING_MODES.ACCUMULATOR },
+	0x4c: {name: "jmp", addressing: ADDRESSING_MODES.ABSOLUTE, branch: true, terminal: true },
+	0x4d: {name: "eor", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x4e: {name: "lsr", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x50: {name: "bvc", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0x51: {name: "eor", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0x55: {name: "eor", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x56: {name: "lsr", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x58: {name: "cli", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x59: {name: "eor", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0x5d: {name: "eor", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x5e: {name: "lsr", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x60: {name: "rts", addressing: ADDRESSING_MODES.IMPLICIT, terminal: true },
+	0x61: {name: "adc", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0x65: {name: "adc", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x66: {name: "ror", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x68: {name: "pla", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x69: {name: "adc", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0x6a: {name: "ror", addressing: ADDRESSING_MODES.ACCUMULATOR },
+	0x6c: {name: "jmp", addressing: ADDRESSING_MODES.INDIRECT, branch: true, terminal: true },
+	0x6d: {name: "adc", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x6e: {name: "ror", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x70: {name: "bvs", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0x71: {name: "adc", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0x75: {name: "adc", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x76: {name: "ror", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x78: {name: "sei", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x79: {name: "adc", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0x7d: {name: "adc", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x7e: {name: "ror", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0x81: {name: "sta", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0x84: {name: "sty", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x85: {name: "sta", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x86: {name: "stx", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0x88: {name: "dey", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x8a: {name: "txa", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x8c: {name: "sty", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x8d: {name: "sta", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x8e: {name: "stx", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0x90: {name: "bcc", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0x91: {name: "sta", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0x94: {name: "sty", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x95: {name: "sta", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0x96: {name: "stx", addressing: ADDRESSING_MODES.ZEROPAGE_Y },
+	0x98: {name: "tya", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x99: {name: "sta", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0x9a: {name: "txs", addressing: ADDRESSING_MODES.IMPLICIT },
+	0x9d: {name: "sta", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0xa0: {name: "ldy", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0xa1: {name: "lda", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0xa2: {name: "ldx", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0xa4: {name: "ldy", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xa5: {name: "lda", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xa6: {name: "ldx", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xa8: {name: "tay", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xa9: {name: "lda", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0xaa: {name: "tax", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xac: {name: "ldy", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xad: {name: "lda", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xae: {name: "ldx", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xb0: {name: "bcs", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0xb1: {name: "lda", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0xb4: {name: "ldy", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0xb5: {name: "lda", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0xb6: {name: "ldx", addressing: ADDRESSING_MODES.ZEROPAGE_Y },
+	0xb8: {name: "clv", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xb9: {name: "lda", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0xba: {name: "tsx", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xbc: {name: "ldy", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0xbd: {name: "lda", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0xbe: {name: "ldx", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0xc0: {name: "cpy", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0xc1: {name: "cmp", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0xc4: {name: "cpy", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xc5: {name: "cmp", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xc6: {name: "dec", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xc8: {name: "iny", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xc9: {name: "cmp", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0xca: {name: "dex", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xcc: {name: "cpy", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xcd: {name: "cmp", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xce: {name: "dec", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xd0: {name: "bne", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0xd1: {name: "cmp", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0xd5: {name: "cmp", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0xd6: {name: "dec", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0xd8: {name: "cld", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xd9: {name: "cmp", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0xdd: {name: "cmp", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0xde: {name: "dec", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0xe0: {name: "cpx", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0xe1: {name: "sbc", addressing: ADDRESSING_MODES.INDEXED_INDIRECT },
+	0xe4: {name: "cpx", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xe5: {name: "sbc", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xe6: {name: "inc", addressing: ADDRESSING_MODES.ZEROPAGE },
+	0xe8: {name: "inx", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xe9: {name: "sbc", addressing: ADDRESSING_MODES.IMMEDIATE },
+	0xea: {name: "nop", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xec: {name: "cpx", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xed: {name: "sbc", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xee: {name: "inc", addressing: ADDRESSING_MODES.ABSOLUTE },
+	0xf0: {name: "beq", addressing: ADDRESSING_MODES.RELATIVE, branch: true },
+	0xf1: {name: "sbc", addressing: ADDRESSING_MODES.INDIRECT_INDEXED },
+	0xf5: {name: "sbc", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0xf6: {name: "inc", addressing: ADDRESSING_MODES.ZEROPAGE_X },
+	0xf8: {name: "sed", addressing: ADDRESSING_MODES.IMPLICIT },
+	0xf9: {name: "sbc", addressing: ADDRESSING_MODES.ABSOLUTE_Y },
+	0xfd: {name: "sbc", addressing: ADDRESSING_MODES.ABSOLUTE_X },
+	0xfe: {name: "inc", addressing: ADDRESSING_MODES.ABSOLUTE_X },
 };
 
 // decode INES ROM format
@@ -191,9 +192,7 @@ const readROM = rom => {
         throw new Error("ROM header magic incorrect");
     }
 
-    const prgRomSize = rom[4] * 16384,
-          chrRomSize = rom[5] * 8192;
-
+    const prgRomSize = rom[4] * 16384, chrRomSize = rom[5] * 8192;
     return {
         prgRom: rom.subarray(16, 16 + prgRomSize),
         rom: rom.subarray(16 + prgRomSize, 16 + prgRomSize + chrRomSize)
@@ -202,14 +201,18 @@ const readROM = rom => {
 };
 
 // formatting instructions
-const addrToLabel = addr => "_label_" + addr.toString(16).padStart(4, '0');
 const byte2hex = byte => byte.toString(16).padStart(2, '0');
 const word2hex = word => word.toString(16).padStart(4, '0');
 
-const disassemble = prgRom => {
+const warn = (addr, message) => console.log(`warning: $${word2hex(addr)}: ${message}`);
 
-    // record branch targets so labels can be inserted in the output assembly
-    const branchTargets = [];
+class DisassemblyError extends Error {
+    constructor(offset, message) {
+        super(`$${word2hex(offset)}: ${message}`);
+    }
+}
+
+const disassemble = (prgRom, hints) => {
 
     // each byte in the program ROM is either part of an instruction or data
     // we associate the first byte of each opcode with the decoded instruction, and assume everything else is data
@@ -218,16 +221,19 @@ const disassemble = prgRom => {
         byteTags[i] = {data: prgRom[i]};
     }
 
+    const lookupSymbol = addr => hints.symbols.find(symbol => symbol.addr == addr)?.name;
+    //const addrToLabel = addr => hints.symbols.find(symbol => symbol.addr == addr)?.name ||  "_label_" + addr.toString(16).padStart(4, '0');
+
     const disassembleRecursive = startPC => {
 
-        // if we've already disassembled here, don't visit again
-        const initialTag = byteTags[startPC - PRG_ROM_BASE];
-        if(!initialTag || initialTag.disasm) {
+        // if this location has already been disassembled, don't need to go over it again
+        const tag = byteTags[startPC - PRG_ROM_BASE];
+        if(tag == null) {
+            throw new DisassemblyError(startPC, "Jump to middle of instruction detected");
+        }
+        if(tag.disasm) {
             return;
         }
-
-        // record branch target
-        branchTargets.push(startPC);
 
         let pc = startPC;
         const readByte = () => prgRom[pc++ - PRG_ROM_BASE];
@@ -244,12 +250,31 @@ const disassemble = prgRom => {
             const opcode = readByte();
             const insn = INSTRUCTIONS[opcode];
             if(!insn) {
-                throw new Error(`Unknown opcode 0x${opcode.toString(16).padStart(2, '0')}`);
+                throw new DisassemblyError(insnOffset, `Unknown opcode 0x${opcode.toString(16).padStart(2, '0')}`);
+            }
+
+            // when possible, resolve branch targets ahead of time
+            let target = null;
+            if(insn.addressing == ADDRESSING_MODES.RELATIVE) {
+                const nextPC = insnOffset + 2, 
+                      offset = readByte() << 24 >> 24; // sign-extend 
+                target = nextPC + offset;
+            } else if(insn.addressing == ADDRESSING_MODES.ABSOLUTE) {
+                target = readWord();
+            }
+
+            // if instruction is a branch and target is known, resolve symbol or create new one
+            let symbol = null;
+            if(insn.branch && target != null) {
+                symbol = lookupSymbol(target);
+                if(!symbol) {
+                    symbol = (insn.name == "jsr" ? "_func_" : "_label_") + word2hex(target);
+                    hints.symbols.push({name: symbol, addr: target});
+                }
             }
 
             // decode operands
             let disasm = null;
-            let target = null;
             switch(insn.addressing) {
                 case ADDRESSING_MODES.IMPLICIT:
                     disasm = insn.name;
@@ -270,15 +295,11 @@ const disassemble = prgRom => {
                     disasm = `${insn.name} $${byte2hex(readByte())},Y`;
                     break;
                 case ADDRESSING_MODES.RELATIVE:
-                    const nextPC = insnOffset + 2,
-                          offset = readByte() << 24 >> 24; // sign-extend signed 8 bit offset
-                    target = nextPC + offset;
-                    disasm = `${insn.name} ${addrToLabel(target)}`;
+                    disasm = `${insn.name} ${symbol}`;
                     break;
                 case ADDRESSING_MODES.ABSOLUTE:
-                    target = readWord();
                     if(insn.branch)
-                        disasm = `${insn.name} ${addrToLabel(target)}`;
+                        disasm = `${insn.name} ${symbol}`;
                     else
                         disasm = `${insn.name} $${word2hex(target)}`;
                     break;
@@ -299,6 +320,11 @@ const disassemble = prgRom => {
                     break;
             }
 
+            // warn if target could not be identified
+            if(insn.branch && target == null) {
+                warn(insnOffset, "Could not resolve branch target, disassembly may be incomplete");
+            }
+
             // tag first byte of instruction with disassembly, and null the other bytes of the instruction
             const tag = {disasm, length: pc - insnOffset};
             byteTags[insnOffset - PRG_ROM_BASE] = tag;
@@ -306,48 +332,66 @@ const disassemble = prgRom => {
                 byteTags[i - PRG_ROM_BASE] = null;
             }
 
-            // follow branches
-            let subroutineReturns = null;
+            // if there's a branch, disassemble the target
             if(insn.branch) {
                 if(target) {
-                    subroutineReturns = disassembleRecursive(target);
+                    try {
+                        disassembleRecursive(target);
+                    } catch(error) {
+                        console.error(error);
+                    }
                 } else {
                     tag.unknownTarget = true;
                 }
             }
-            
-            // if branch was terminal, don't continue disassembling; indicate whether this subroutine returns to caller in the returns
-            if(insn.terminal || (insn.name == "JSR" && !subroutineReturns)) {
-                return insn.name == "RTS";
+
+            // if a branch is "terminal", then we do not expect execution to continue afterwards
+            // we can infer this for certain instructions (unconditional branches)
+            if(insn.terminal || (insn.name == "jsr" && hints.nonreturns.includes(target))) {
+                return;
             }
 
         }
 
     };
 
-    // start disassembly at known locations
-    disassembleRecursive(prgRom.readUInt16LE(NMI_VECTOR - PRG_ROM_BASE));
-    disassembleRecursive(prgRom.readUInt16LE(RESET_VECTOR - PRG_ROM_BASE));
-    disassembleRecursive(prgRom.readUInt16LE(IRQ_VECTOR - PRG_ROM_BASE));
+    // start disassembly from known execution locations, and also register symbols for them
+    hints.symbols.push({name: "_nmi", addr: prgRom.readUInt16LE(NMI_VECTOR - PRG_ROM_BASE)});
+    hints.symbols.push({name: "_reset", addr: prgRom.readUInt16LE(RESET_VECTOR - PRG_ROM_BASE)});
+    hints.symbols.push({name: "_irq", addr: prgRom.readUInt16LE(IRQ_VECTOR - PRG_ROM_BASE)});
+
+    for(const {addr} of hints.symbols) {
+        try {
+            disassembleRecursive(Number(addr));
+        } catch(error) {
+            console.error(error);
+        }
+    }
 
     // write output
     let outLines = [];
     for(let i = 0; i < byteTags.length; i++) {
+        
         const addr = i + PRG_ROM_BASE;
-        const tag = byteTags[i];
-        if(branchTargets.includes(addr)) {
-            outLines.push(`${addrToLabel(addr)}:`)
+
+        const symbols = hints.symbols.filter(symbol => symbol.addr == addr);
+        for(const symbol of symbols) {
+            outLines.push(symbol.name + ":");
         }
+
+        const tag = byteTags[i];
         if(tag != null) {
             const hexdump = Array.from(prgRom.subarray(i, i + (tag.length || 1))).map(byte2hex).join(" ");
-            outLines.push(`    ${word2hex(addr)}: ${hexdump.padEnd(8, ' ')}    ${(tag.disasm || "??").padEnd(12, ' ')} ${tag.unknownTarget ? "; UNKNOWN TARGET" : ""}`);
+            outLines.push(`    ${word2hex(addr)}: ${hexdump.padEnd(15, ' ')} ${(tag.disasm || "??").padEnd(16, ' ')} ${tag.unknownTarget ? "; (auto) unknown target" : ""}`);
         }
+
     }
 
     return outLines.join("\n");
 
 };
 
-// usage: node tools/disassemble.js [IN-ROM] [OUT-DUMP]
+// usage: node tools/disassemble.js [IN-ROM] [HINTS-FILE] [OUT-DUMP]
 const rom = readROM(fs.readFileSync(process.argv[2]));
-fs.writeFileSync(process.argv[3], disassemble(rom.prgRom));
+const hints = parseHints(process.argv[3]);
+fs.writeFileSync(process.argv[4], disassemble(rom.prgRom, hints));
