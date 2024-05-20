@@ -7,7 +7,6 @@ constant OAMDATA    0x2004
 constant PPUSCROLL  0x2005
 constant PPUADDR    0x2006
 constant PPUDATA    0x2007
-
 constant SQ1_VOL    0x4000
 constant SQ1_SWEEP  0x4001
 constant SQ1_LO     0x4002
@@ -31,6 +30,7 @@ constant SND_CHN    0x4015
 constant JOY1       0x4016
 constant JOY2       0x4017
 
+# Reads offset from bytes following calling instruction and jumps
 symbol jumpTable 0xac82
 nonreturn 0xac82
 
@@ -84,5 +84,6 @@ symbol _jt_81db_0 0x9e39
 symbol _jt_81db_0 0x9a11
 symbol _jt_81db_0 0x9e37
 
-# ???
-nonreturn 0xaa98
+# Adds 2 to return address
+retaddr-adjust 0xaa98 2
+symbol adjust-retaddr-save-to-tmp 0xab21

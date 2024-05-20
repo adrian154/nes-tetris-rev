@@ -6,7 +6,8 @@ module.exports = hintsFile => {
     const hints = {
         symbols: [], 
         nonreturns: [],
-        constants: {}
+        constants: {},
+        retaddrAdjust: {}
     };
     
     const lines = fs.readFileSync(hintsFile, "ascii").split("\n").map(l => l.trim());
@@ -27,6 +28,10 @@ module.exports = hintsFile => {
             if(parts.length != 3)
                 throw new Error("Syntax: constant <name> <value>");
             hints.constants[Number(parts[2])] = parts[1];
+        } else if(parts[0] == "retaddr-adjust") {
+            if(parts.length != 3)
+                throw new Error("Syntax: retaddr-adjust <addr> <amount>");
+            hints.retaddrAdjust[Number(parts[1])] = Number(parts[2]);
         } else {
             throw new Error("Unknown directive " + parts[0]);
         }

@@ -351,6 +351,11 @@ const disassemble = (prgRom, hints) => {
                 return;
             }
 
+            // KLUDGE: some procedures in Tetris modify the return address by a fixed amount, we handle these manually
+            if(insn.name == "jsr" && hints.retaddrAdjust[target]) {
+                pc += hints.retaddrAdjust[target];
+            }
+
         }
 
     };
