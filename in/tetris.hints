@@ -34,12 +34,14 @@ constant JOY2       0x4017
 symbol jumpTable 0xac82
 nonreturn 0xac82
 
+# jumptable @ 804d
 symbol _jt_804d_0 0x82b1
 symbol _jt_804d_1 0x85da
 symbol _jt_804d_2 0xa344
 symbol _jt_804d_3 0x94ee
 symbol _jt_804d_4 0x9f95
 
+# jumptable @ 8163
 symbol _jt_8163_0 0x8200
 symbol _jt_8163_1 0x824f
 symbol _jt_8163_2 0x82d1
@@ -48,6 +50,7 @@ symbol _jt_8163_4 0x815d
 symbol _jt_8163_5 0x815d
 symbol _jt_8163_6 0x9df6
 
+# jumptable @ 819d
 symbol _jt_819d_0 0x85f0
 symbol _jt_819d_1 0x86dc
 symbol _jt_819d_2 0x8884
@@ -58,6 +61,7 @@ symbol _jt_819d_6 0x9e16
 symbol _jt_819d_7 0xa37f
 symbol _jt_819d_8 0x9e27
 
+# jumptable @ 81b4
 symbol _jt_81b4_0 0x9e2f
 symbol _jt_81b4_1 0x81cf
 symbol _jt_81b4_2 0x99a2
@@ -71,18 +75,36 @@ symbol _jt_81b4_9 0x9e39
 symbol _jt_81b4_10 0x9a11 
 symbol _jt_81b4_11 0x9e37 
 
+# jumptable @ 81db 
 symbol _jt_81db_0 0x9e2f
-symbol _jt_81db_1 0x81f6
-symbol _jt_81db_0 0x992a
-symbol _jt_81db_0 0x9a6b
-symbol _jt_81db_0 0x9e39
-symbol _jt_81db_0 0x9b58
-symbol _jt_81db_0 0xa3f2
-symbol _jt_81db_0 0x9b03
-symbol _jt_81db_0 0x988e
-symbol _jt_81db_0 0x9e39
-symbol _jt_81db_0 0x9a11
-symbol _jt_81db_0 0x9e37
+symbol _jt_81db_1 0x81cf
+symbol _jt_81db_2 0x99a2
+symbol _jt_81db_3 0x9a6b
+symbol _jt_81db_4 0x9e39
+symbol _jt_81db_5 0x9b58
+symbol _jt_81db_6 0xa3f2
+symbol _jt_81db_7 0x9b03 
+symbol _jt_81db_8 0x988e 
+symbol _jt_81db_9 0x9e39 
+symbol _jt_81db_10 0x9a11 
+symbol _jt_81db_11 0x9e37
+
+# jumptable @ a4b3
+symbol _jt_a4b3_0 0xa4c4
+symbol _jt_a4b3_1 0xa4cf
+symbol _jt_a4b3_2 0xa4da
+symbol _jt_a4b3_3 0xa4e5
+symbol _jt_a4b3_4 0xa4f0
+symbol _jt_a4b3_5 0xa4fb
+symbol _jt_a4b3_6 0xa506
+
+# jumptable @ a53d
+symbol _jt_a53d_0 0xa609
+symbol _jt_a53d_1 0xa5f1
+symbol _jt_a53d_2 0xa5d9
+symbol _jt_a53d_3 0xa5c1
+symbol _jt_a53d_4 0xa5a9
+symbol _jt_a53d_0 0xa54c
 
 # Adds 2 to return address
 retaddr-adjust 0xaa98 2
